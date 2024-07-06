@@ -1,1 +1,90 @@
-just checkout the feutrues of git 
+#include   
+#include   
+#include   
+#include <map>  
+#include   
+#include   
+#include   
+#include   
+  
+using namespace std;  
+using namespace rapidjson;  
+  
+// Structure to represent a web page  
+struct WebPage {  
+    string url;  
+    string title;  
+    string content;  
+    vector links;  
+};  
+  
+// Function to extract links from HTML content  
+vector extractLinks(const string&amp; content) {  
+    vector links;  
+    size_t pos = 0;  
+    while ((pos = content.find("<a href=", pos))!= string::npos) {  
+        size_t endPos = content.find(">", pos);  
+        string link = content.substr(pos + 8, endPos - pos - 8);  
+        link = link.substr(0, link.find('"'));  
+        links.push_back(link);  
+        pos = endPos;  
+    }  
+    return links;  
+}  
+  
+// Function to crawl a web page and extract links  
+WebPage crawlPage(const string&amp; url) {  
+    CURL *curl;  
+    CURLcode res;  
+    string readBuffer;  
+    WebPage page;  
+  
+    curl_global_init(CURL_GLOBAL_DEFAULT);  
+    curl = curl_easy_init();  
+    if(curl) {  
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());  
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeMemoryCallback);  
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &amp;readBuffer);  
+        res = curl_easy_perform(curl);  
+        if(res!= CURLE_OK) {  
+            fprintf(stderr, "cURL error: %s\n", curl_easy_strerror(res));  
+        } else {  
+            Document doc;  
+            doc.Parse(readBuffer.c_str());  
+            page.url = url;  
+            page.title = doc["title"].GetString();  
+            page.content = readBuffer;  
+            page.links = extractLinks(readBuffer);  
+        }  
+        curl_easy_cleanup(curl);  
+    }  
+    curl_global_cleanup();  
+    return page;  
+}  
+  
+// Function to index web pages  
+void indexPages(const vector&amp; pages) {  
+    // TO DO: implement indexing logic here  
+    // For example, you can store the pages in a database or a file  
+    cout &lt;&lt; "Indexed " &lt;&lt; pages.size() &lt;&lt; " web pages." &lt;&lt; endl;  
+}  
+  
+int main() {  
+    vector pages;  
+    string startUrl = "https://www.example.com";  
+    WebPage startPage = crawlPage(startUrl);  
+    pages.push_back(startPage);  
+  
+    // Crawl and index linked pages  
+    for (const auto&amp; page : pages) {  
+        for (const auto&amp; link : page.links) {  
+            if (link.find("http") == 0) {  
+                WebPage linkedPage = crawlPage(link);  
+                pages.push_back(linkedPage);  
+            }  
+        }  
+    }  
+  
+    indexPages(pages);  
+    return 0;  
+}  
